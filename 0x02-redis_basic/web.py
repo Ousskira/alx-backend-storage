@@ -6,31 +6,29 @@ import requests
 from functools import wraps
 from typing import Callable
 
+
 redis_store = redis.Redis()
 '''The module-level Redis instance.
 '''
 
+
 def data_cacher(method: Callable) -> Callable:
-    '''Caches the output of fetched data and tracks URL access.
+    '''Caches the output of fetched data.
     '''
     @wraps(method)
     def invoker(url) -> str:
         '''The wrapper function for caching the output.
         '''
-        # Increment the access count for the URL
         redis_store.incr(f'count:{url}')
-        
-        # Try to fetch the cached result
         result = redis_store.get(f'result:{url}')
         if result:
             return result.decode('utf-8')
-        
-        # If not cached, fetch the result, cache it, and set an expiration time of 10 seconds
         result = method(url)
+        redis_store.set(f'count:{url}', 0)
         redis_store.setex(f'result:{url}', 10, result)
         return result
-    
     return invoker
+
 
 @data_cacher
 def get_page(url: str) -> str:
@@ -38,4 +36,3 @@ def get_page(url: str) -> str:
     and tracking the request.
     '''
     return requests.get(url).text
-
